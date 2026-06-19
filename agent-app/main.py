@@ -122,6 +122,10 @@ async def _get_tools_for_user(user_id: str) -> tuple[list, str]:
         log.warning("Scalekit not configured — running memory-only (no external tools)")
         return [], "none"
 
+    if not os.environ.get("SCALEKIT_CONNECTION_NAME"):
+        log.warning("SCALEKIT_CONNECTION_NAME not set — running memory-only (no external tools)")
+        return [], "none"
+
     conn_status = ensure_user_connection(user_id)
     if conn_status["status"] != "ACTIVE":
         log.warning(
