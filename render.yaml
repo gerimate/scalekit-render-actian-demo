@@ -25,7 +25,7 @@ services:
   # -------------------------------------------------------------------------
   - type: pserv
     name: vectorai-db
-    env: docker
+    runtime: image
     # Pull the official Actian image directly — no Dockerfile needed.
     # Do NOT use api.vectorai.actian.com; that endpoint is not live.
     image:
@@ -48,7 +48,7 @@ services:
   # -------------------------------------------------------------------------
   - type: web
     name: agent-app
-    env: python
+    runtime: python
     region: oregon
     plan: starter
     rootDir: agent-app
