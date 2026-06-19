@@ -27,7 +27,7 @@ langchain-core>=0.3.0
 langchain-mcp-adapters>=0.3.0
 
 # Scalekit identity + tool calling
-scalekit-sdk-python
+scalekit-sdk-python==2.12.0
 
 # HTTP (used by Scalekit SDK and FastAPI internally)
 httpx>=0.27.0

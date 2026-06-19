@@ -22,9 +22,9 @@ from __future__ import annotations
 import logging
 import os
 from datetime import timedelta
+from typing import Any
 
 from scalekit import ScalekitClient
-from scalekit.actions import ActionClient
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _scalekit: ScalekitClient | None = None
-_actions: ActionClient | None = None
+_actions: Any = None
 
 
 def get_scalekit_client() -> ScalekitClient:
@@ -47,7 +47,7 @@ def get_scalekit_client() -> ScalekitClient:
     return _scalekit
 
 
-def get_actions_client() -> ActionClient:
+def get_actions_client() -> Any:
     """
     Return an ActionClient, building it directly from ScalekitClient's
     sub-clients rather than relying on sc.actions.  The sc.actions attribute
@@ -61,6 +61,7 @@ def get_actions_client() -> ActionClient:
             _actions = sc.actions
         else:
             log.warning("sc.actions not available — constructing ActionClient directly")
+            from scalekit.actions import ActionClient  # lazy import; may vary by SDK version
             _actions = ActionClient(sc.tools, sc.connected_accounts, sc.mcp)
     return _actions
 
