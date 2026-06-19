@@ -32,9 +32,7 @@ scalekit-sdk-python==2.12.0
 # HTTP (used by Scalekit SDK and FastAPI internally)
 httpx>=0.27.0
 
-# Protobuf version override: actian-vectorai-client is built against protobuf
-# >= 6.31.1 gencode.  scalekit-sdk-python has a conservative upper bound of
-# protobuf<7.0.0 in its metadata, but works fine at runtime with protobuf 7.x.
-# Pin explicitly so pip doesn't resolve to 5.x, which causes a VersionError.
+# protobuf>=6.31.1 is required by actian-vectorai-client at runtime.
+# grpcio-status is intentionally left unpinned here so that
+# scalekit-sdk-python's own constraint (<1.67,>=1.64) wins without conflict.
 protobuf>=6.31.1
-grpcio-status>=1.67.0
