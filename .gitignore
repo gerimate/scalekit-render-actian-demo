@@ -1,0 +1,21 @@
+# Secrets — never commit real credentials
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Local dev data
+local_data/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

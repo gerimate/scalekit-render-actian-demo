@@ -1,0 +1,40 @@
+# Web framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+
+# Environment / config
+python-dotenv>=1.0.0
+
+# LLM
+langchain-anthropic>=0.3.0
+
+# Embeddings — local sentence-transformers, no API key required.
+# The model (~90 MB) is downloaded on first use and cached in
+# ~/.cache/huggingface.  On Render, add a persistent cache disk or
+# accept the one-time download on cold start.
+langchain-huggingface>=0.1.0
+sentence-transformers>=3.0.0
+
+# VectorAI DB — langchain-actian-vectorai pulls actian-vectorai-client as a
+# transitive dependency, so we don't need to list it separately.
+langchain-actian-vectorai>=1.0.0
+
+# LangGraph agent framework
+langgraph>=0.2.0
+langchain-core>=0.3.0
+
+# MCP tool integration (Scalekit Virtual MCP Server)
+langchain-mcp-adapters>=0.3.0
+
+# Scalekit identity + tool calling
+scalekit-sdk-python
+
+# HTTP (used by Scalekit SDK and FastAPI internally)
+httpx>=0.27.0
+
+# Protobuf version override: actian-vectorai-client is built against protobuf
+# >= 6.31.1 gencode.  scalekit-sdk-python has a conservative upper bound of
+# protobuf<7.0.0 in its metadata, but works fine at runtime with protobuf 7.x.
+# Pin explicitly so pip doesn't resolve to 5.x, which causes a VersionError.
+protobuf>=6.31.1
+grpcio-status>=1.67.0

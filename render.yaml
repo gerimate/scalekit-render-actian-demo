@@ -1,0 +1,85 @@
+# Render Blueprint — two-service deployment
+#
+# Services:
+#   vectorai-db  Private Docker service running actian/vectorai:latest.
+#                Not public — agent-app reaches it over Render's internal
+#                private network at vectorai-db:6574 (gRPC).
+#
+#   agent-app    Public Python web service running the LangGraph agent +
+#                FastAPI. This is the live demo URL.
+#
+# Before deploying:
+#   1. Run `python agent-app/setup_mcp.py` and copy the printed env var
+#      values into the agent-app section below (or set them in the
+#      Render dashboard after the first deploy).
+#   2. Attach a Persistent Disk to vectorai-db — requires Starter plan or
+#      higher.  The blueprint declares the disk; confirm the plan supports
+#      it in the Render dashboard.
+#
+# Deploy:
+#   render blueprint apply  (or connect this repo in the Render dashboard)
+
+services:
+  # -------------------------------------------------------------------------
+  # VectorAI DB — private Docker service
+  # -------------------------------------------------------------------------
+  - type: pserv
+    name: vectorai-db
+    # Pull the official Actian image directly — no Dockerfile needed.
+    # Do NOT use api.vectorai.actian.com; that endpoint is not live.
+    image:
+      url: docker.io/actian/vectorai:latest
+    plan: starter
+    region: oregon
+    envVars:
+      # Container will not start without this.
+      - key: ACTIAN_VECTORAI_ACCEPT_EULA
+        value: "YES"
+    # Persistent disk — required so vectors survive container restarts.
+    # Confirm your Render plan supports persistent disks before deploying.
+    disk:
+      name: vectorai-data
+      mountPath: /var/lib/actian-vectorai
+      sizeGB: 10
+
+  # -------------------------------------------------------------------------
+  # agent-app — public Python web service
+  # -------------------------------------------------------------------------
+  - type: web
+    name: agent-app
+    runtime: python
+    region: oregon
+    plan: starter
+    rootDir: agent-app
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      # VectorAI DB — private network hostname (service name + gRPC port).
+      - key: VECTORAI_DB_URL
+        value: vectorai-db:6574
+
+      # Anthropic — used for the LLM (claude-3-5-haiku-20241022).
+      # Embeddings use local sentence-transformers; no extra key needed.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+
+      # Scalekit credentials — get from Scalekit dashboard → Developers →
+      # Settings → API Credentials.
+      - key: SCALEKIT_ENV_URL
+        sync: false
+      - key: SCALEKIT_CLIENT_ID
+        sync: false
+      - key: SCALEKIT_CLIENT_SECRET
+        sync: false
+
+      # Connector slug as configured in Scalekit dashboard (e.g. "github").
+      - key: SCALEKIT_CONNECTION_NAME
+        sync: false
+
+      # Virtual MCP Server — populated after running setup_mcp.py.
+      # If these are absent the app falls back to the direct LangChain
+      # adapter path (actions.langchain.get_tools).
+      - key: SCALEKIT_MCP_CONFIG_ID
+        sync: false
+      - key: SCALEKIT_MCP_SERVER_URL
+        sync: false

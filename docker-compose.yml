@@ -1,0 +1,58 @@
+# Local development stack
+#
+# Starts VectorAI DB exactly as the brief specifies, plus the agent-app
+# service so the full two-service architecture can be exercised locally.
+#
+# Usage:
+#   cp .env.example .env      # fill in your API keys
+#   docker-compose up         # starts both services
+#
+# Then open http://localhost:8000 for the demo UI.
+#
+# VectorAI DB gRPC endpoint for local use: localhost:6574
+# When running via docker-compose the agent-app container reaches it at
+# vectorai-db:6574 (the service name on the Docker bridge network).
+
+services:
+  vectorai-db:
+    image: actian/vectorai:latest
+    container_name: vectorai
+    environment:
+      ACTIAN_VECTORAI_ACCEPT_EULA: "YES"
+    volumes:
+      # Use a named volume so data persists across container restarts.
+      - vectorai-data:/var/lib/actian-vectorai
+    ports:
+      # Expose all three VectorAI DB ports for local tooling / inspection.
+      # agent-app uses 6574 (gRPC).
+      - "6573:6573"
+      - "6574:6574"
+      - "6575:6575"
+    restart: unless-stopped
+    healthcheck:
+      # VectorAI DB does not expose a documented HTTP health endpoint on 6573
+      # or 6575 in Community Edition — use a TCP probe instead.
+      test: ["CMD-SHELL", "echo > /dev/tcp/localhost/6574 && echo ok || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  agent-app:
+    build:
+      context: ./agent-app
+      dockerfile: Dockerfile.dev
+    container_name: agent-app
+    env_file: .env
+    environment:
+      # Override VECTORAI_DB_URL to use the Docker service name.
+      VECTORAI_DB_URL: vectorai-db:6574
+    ports:
+      - "8000:8000"
+    depends_on:
+      vectorai-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  vectorai-data:
