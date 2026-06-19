@@ -36,12 +36,8 @@ services:
       # Container will not start without this.
       - key: ACTIAN_VECTORAI_ACCEPT_EULA
         value: "YES"
-    # Persistent disk — required so vectors survive container restarts.
-    # Confirm your Render plan supports persistent disks before deploying.
-    disk:
-      name: vectorai-data
-      mountPath: /var/lib/actian-vectorai
-      sizeGB: 10
+    # Persistent disk must be added manually in the Render dashboard after first deploy:
+    # Disks → Add Disk → mountPath: /var/lib/actian-vectorai, size: 10 GB
 
   # -------------------------------------------------------------------------
   # agent-app — public Python web service
