@@ -24,14 +24,16 @@ import os
 from datetime import timedelta
 
 from scalekit import ScalekitClient
+from scalekit.actions import ActionClient
 
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Client singleton
+# Client singletons
 # ---------------------------------------------------------------------------
 
 _scalekit: ScalekitClient | None = None
+_actions: ActionClient | None = None
 
 
 def get_scalekit_client() -> ScalekitClient:
@@ -43,6 +45,24 @@ def get_scalekit_client() -> ScalekitClient:
             client_secret=os.environ["SCALEKIT_CLIENT_SECRET"],
         )
     return _scalekit
+
+
+def get_actions_client() -> ActionClient:
+    """
+    Return an ActionClient, building it directly from ScalekitClient's
+    sub-clients rather than relying on sc.actions.  The sc.actions attribute
+    is not reliably set on all Python versions (Python 3.14 on Render).
+    """
+    global _actions
+    if _actions is None:
+        sc = get_scalekit_client()
+        # Prefer sc.actions if available; fall back to constructing directly.
+        if hasattr(sc, "actions") and sc.actions is not None:
+            _actions = sc.actions
+        else:
+            log.warning("sc.actions not available — constructing ActionClient directly")
+            _actions = ActionClient(sc.tools, sc.connected_accounts, sc.mcp)
+    return _actions
 
 
 # ---------------------------------------------------------------------------
@@ -58,9 +78,9 @@ def ensure_user_connection(user_id: str) -> dict:
         {"status": <other>, "auth_url": "..."} if the user must authorize.
     """
     connection_name = _connection_name()
-    sc = get_scalekit_client()
+    actions = get_actions_client()
 
-    account_resp = sc.actions.get_or_create_connected_account(
+    account_resp = actions.get_or_create_connected_account(
         connection_name=connection_name,
         identifier=user_id,
     )
@@ -69,7 +89,7 @@ def ensure_user_connection(user_id: str) -> dict:
     if account.status == "ACTIVE":
         return {"status": "ACTIVE"}
 
-    link_resp = sc.actions.get_authorization_link(
+    link_resp = actions.get_authorization_link(
         connection_name=connection_name,
         identifier=user_id,
     )
@@ -78,8 +98,8 @@ def ensure_user_connection(user_id: str) -> dict:
 
 def verify_user_connection(auth_request_id: str, user_id: str) -> str:
     """Verify the OAuth callback for a user. Returns post-verify redirect URL."""
-    sc = get_scalekit_client()
-    result = sc.actions.verify_connected_account_user(
+    actions = get_actions_client()
+    result = actions.verify_connected_account_user(
         auth_request_id=auth_request_id,
         identifier=user_id,
     )
@@ -106,9 +126,9 @@ def mint_mcp_session_token(user_id: str, expiry_minutes: int = 60) -> str:
     MultiServerMCPClient.  The token is scoped to exactly this user and
     this MCP config; no other user's tools are accessible.
     """
-    sc = get_scalekit_client()
+    actions = get_actions_client()
     config_id = os.environ["SCALEKIT_MCP_CONFIG_ID"]
-    token_resp = sc.actions.mcp.create_session_token(
+    token_resp = actions.mcp.create_session_token(
         mcp_config_id=config_id,
         identifier=user_id,
         expiry=timedelta(minutes=expiry_minutes),
@@ -148,8 +168,8 @@ def get_langchain_tools(user_id: str) -> list:
     direct adapter — no MCP server config required.
     """
     connection_name = _connection_name()
-    sc = get_scalekit_client()
-    tools = sc.actions.langchain.get_tools(
+    actions = get_actions_client()
+    tools = actions.langchain.get_tools(
         identifier=user_id,
         connection_names=[connection_name] if connection_name else None,
         page_size=100,
