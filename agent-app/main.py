@@ -234,11 +234,26 @@ async def seed(req: SeedRequest):
     if len(req.memories) > 20:
         raise HTTPException(status_code=400, detail="Max 20 memories per seed call")
 
-    from memory import get_user_store
+    from memory import get_user_store, _reset_client
+    from actian_vectorai.exceptions import VectorAIError
+    from actian_vectorai.exceptions import ConnectionError as VAIConnectionError
 
-    store = get_user_store(user_id)
-    ids = store.add_texts(req.memories, metadatas=[{"user_id": user_id}] * len(req.memories))
-    return {"user_id": user_id, "inserted": len(ids), "ids": ids}
+    for attempt in range(2):
+        try:
+            store = get_user_store(user_id)
+            ids = store.add_texts(req.memories, metadatas=[{"user_id": user_id}] * len(req.memories))
+            return {"user_id": user_id, "inserted": len(ids), "ids": ids}
+        except VAIConnectionError as exc:
+            if attempt == 0:
+                log.warning("seed: reconnecting after connection error: %s", exc)
+                _reset_client()
+                continue
+            raise HTTPException(status_code=503, detail=f"VectorAI DB unreachable: {exc}")
+        except VectorAIError as exc:
+            raise HTTPException(status_code=500, detail=f"VectorAI error: {exc}")
+        except Exception as exc:
+            log.exception("seed: unexpected error for user %s", user_id)
+            raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.get("/admin/recall")
