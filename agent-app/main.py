@@ -259,16 +259,23 @@ def db_stats():
     """
     from memory import _get_client, _reset_client
     from actian_vectorai.exceptions import VectorAIError
+    from actian_vectorai.exceptions import ConnectionError as VAIConnectionError
     for attempt in range(2):
         try:
             client = _get_client()
             collections = client.collections.list()
-            counts = {col: client.points.count(col) for col in collections}
-            total = sum(counts.values())
+            counts: dict = {}
+            for col in collections:
+                try:
+                    counts[col] = client.points.count(col)
+                except VectorAIError as col_exc:
+                    log.warning("db-stats: count failed for %s: %s", col, col_exc)
+                    counts[col] = -1
+            total = sum(v for v in counts.values() if v >= 0)
             return {"collections": counts, "total_vectors": total, "cap": 5000, "cap_remaining": 5000 - total}
-        except VectorAIError as exc:
+        except VAIConnectionError as exc:
             if attempt == 0:
-                log.warning("db-stats: reconnecting after error: %s", exc)
+                log.warning("db-stats: reconnecting after connection error: %s", exc)
                 _reset_client()
                 continue
             raise HTTPException(status_code=503, detail=f"VectorAI DB unreachable: {exc}")

@@ -14,7 +14,13 @@ import os
 from functools import lru_cache
 
 from actian_vectorai import Distance, VectorAIClient, VectorParams
-from actian_vectorai.exceptions import VectorAIError
+from actian_vectorai.exceptions import (
+    VectorAIError,
+    CollectionExistsError,
+    CollectionNotFoundError,
+    CollectionNotReadyError,
+)
+from actian_vectorai.exceptions import ConnectionError as VAIConnectionError
 from langchain_actian_vectorai import ActianVectorAIVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
 
@@ -70,9 +76,6 @@ def collection_name(user_id: str) -> str:
     return f"user-{user_id}-memories"
 
 
-_CONNECTION_ERRORS = (VectorAIError,)
-
-
 def get_or_create_user_collection(user_id: str) -> str:
     """
     Ensure the per-user collection exists and return its name.
@@ -90,7 +93,10 @@ def get_or_create_user_collection(user_id: str) -> str:
             )
             log.info("Created collection %s", name)
             return name
-        except _CONNECTION_ERRORS as exc:
+        except CollectionExistsError:
+            log.debug("Collection %s already exists — OK", name)
+            return name
+        except VAIConnectionError as exc:
             if attempt == 0:
                 log.warning("VectorAI connection error, reconnecting: %s", exc)
                 _reset_client()
@@ -98,7 +104,7 @@ def get_or_create_user_collection(user_id: str) -> str:
             raise
         except Exception as exc:
             if "already exists" in str(exc).lower():
-                log.debug("Collection %s already exists — OK", name)
+                log.debug("Collection %s already exists (string match) — OK", name)
                 return name
             raise
     return name
