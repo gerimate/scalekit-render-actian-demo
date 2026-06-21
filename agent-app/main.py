@@ -237,6 +237,7 @@ async def seed(req: SeedRequest):
     from memory import get_user_store, _reset_client
     from actian_vectorai.exceptions import VectorAIError
     from actian_vectorai.exceptions import ConnectionError as VAIConnectionError
+    from langchain_actian_vectorai.actian_vectorai import ActianVectorAIException
 
     for attempt in range(2):
         try:
@@ -249,6 +250,8 @@ async def seed(req: SeedRequest):
                 _reset_client()
                 continue
             raise HTTPException(status_code=503, detail=f"VectorAI DB unreachable: {exc}")
+        except ActianVectorAIException as exc:
+            raise HTTPException(status_code=500, detail=f"LangChain VectorAI error: {exc}")
         except VectorAIError as exc:
             raise HTTPException(status_code=500, detail=f"VectorAI error: {exc}")
         except Exception as exc:
