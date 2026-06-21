@@ -257,19 +257,24 @@ def db_stats():
     Return collection names and per-collection vector counts from VectorAI DB.
     Also reports total vectors against the 5,000 Community Edition cap.
     """
-    from memory import _get_client
-    client = _get_client()
-    collections = client.collections.list()
-    counts = {}
-    for col in collections:
-        counts[col] = client.points.count(col)
-    total = sum(counts.values())
-    return {
-        "collections": counts,
-        "total_vectors": total,
-        "cap": 5000,
-        "cap_remaining": 5000 - total,
-    }
+    from memory import _get_client, _reset_client
+    from actian_vectorai.exceptions import VectorAIConnectionError, VectorAITimeoutError, ChannelClosedError
+    _CONNECTION_ERRS = (VectorAIConnectionError, VectorAITimeoutError, ChannelClosedError)
+    for attempt in range(2):
+        try:
+            client = _get_client()
+            collections = client.collections.list()
+            counts = {col: client.points.count(col) for col in collections}
+            total = sum(counts.values())
+            return {"collections": counts, "total_vectors": total, "cap": 5000, "cap_remaining": 5000 - total}
+        except _CONNECTION_ERRS as exc:
+            if attempt == 0:
+                log.warning("db-stats: reconnecting after connection error: %s", exc)
+                _reset_client()
+                continue
+            raise HTTPException(status_code=503, detail=f"VectorAI DB unreachable: {exc}")
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
 
 
 # ---------------------------------------------------------------------------

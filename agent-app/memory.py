@@ -14,6 +14,7 @@ import os
 from functools import lru_cache
 
 from actian_vectorai import Distance, VectorAIClient, VectorParams
+from actian_vectorai.exceptions import VectorAIConnectionError, VectorAITimeoutError, ChannelClosedError
 from langchain_actian_vectorai import ActianVectorAIVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
 
@@ -53,6 +54,13 @@ def _get_client() -> VectorAIClient:
     return _client
 
 
+def _reset_client() -> VectorAIClient:
+    """Drop the singleton and reconnect. Call after any connection-level error."""
+    global _client
+    _client = None
+    return _get_client()
+
+
 # ---------------------------------------------------------------------------
 # Collection management
 # ---------------------------------------------------------------------------
@@ -62,26 +70,36 @@ def collection_name(user_id: str) -> str:
     return f"user-{user_id}-memories"
 
 
+_CONNECTION_ERRORS = (VectorAIConnectionError, VectorAITimeoutError, ChannelClosedError)
+
+
 def get_or_create_user_collection(user_id: str) -> str:
     """
     Ensure the per-user collection exists and return its name.
 
-    VectorAI DB has no get-or-create helper confirmed in its public SDK
-    docs, so we try to create and treat an "already exists" response as
-    success. Any other exception propagates.
+    Retries once on connection-level errors (e.g. after a DB restart)
+    by resetting the singleton and reconnecting.
     """
     name = collection_name(user_id)
-    client = _get_client()
-    try:
-        client.collections.create(
-            name,
-            vectors_config=VectorParams(size=EMBEDDING_DIM, distance=DISTANCE),
-        )
-        log.info("Created collection %s", name)
-    except Exception as exc:
-        if "already exists" in str(exc).lower():
-            log.debug("Collection %s already exists — OK", name)
-        else:
+    for attempt in range(2):
+        try:
+            client = _get_client()
+            client.collections.create(
+                name,
+                vectors_config=VectorParams(size=EMBEDDING_DIM, distance=DISTANCE),
+            )
+            log.info("Created collection %s", name)
+            return name
+        except _CONNECTION_ERRORS as exc:
+            if attempt == 0:
+                log.warning("VectorAI connection error, reconnecting: %s", exc)
+                _reset_client()
+                continue
+            raise
+        except Exception as exc:
+            if "already exists" in str(exc).lower():
+                log.debug("Collection %s already exists — OK", name)
+                return name
             raise
     return name
 
