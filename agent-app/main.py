@@ -258,10 +258,7 @@ def db_stats():
     Also reports total vectors against the 5,000 Community Edition cap.
     """
     from memory import _get_client, _reset_client
-    from actian_vectorai.exceptions import (
-        VectorAIConnectionError, VectorAITimeoutError, ChannelClosedError, CollectionNotFoundError
-    )
-    _RETRY_ERRS = (VectorAIConnectionError, VectorAITimeoutError, ChannelClosedError, CollectionNotFoundError)
+    from actian_vectorai.exceptions import VectorAIError
     for attempt in range(2):
         try:
             client = _get_client()
@@ -269,7 +266,7 @@ def db_stats():
             counts = {col: client.points.count(col) for col in collections}
             total = sum(counts.values())
             return {"collections": counts, "total_vectors": total, "cap": 5000, "cap_remaining": 5000 - total}
-        except _RETRY_ERRS as exc:
+        except VectorAIError as exc:
             if attempt == 0:
                 log.warning("db-stats: reconnecting after error: %s", exc)
                 _reset_client()
