@@ -129,9 +129,20 @@ def recall_memories(user_id: str, query: str, k: int = 5) -> list[str]:
     """Return up to *k* relevant memory strings for this user."""
     if not query.strip():
         return []
-    store = get_user_store(user_id)
-    docs = store.similarity_search(query, k=k)
-    return [doc.page_content for doc in docs]
+    from langchain_actian_vectorai.actian_vectorai import ActianVectorAIException
+    for attempt in range(2):
+        try:
+            store = get_user_store(user_id)
+            docs = store.similarity_search(query, k=k)
+            return [doc.page_content for doc in docs]
+        except (VAIConnectionError, ActianVectorAIException) as exc:
+            if attempt == 0:
+                log.warning("recall_memories: reconnecting after error: %s", exc)
+                _reset_client()
+                continue
+            log.warning("recall_memories: giving up after retry: %s", exc)
+            return []
+    return []
 
 
 def remember_turn(user_id: str, human_text: str, ai_text: str) -> list[str]:
@@ -143,11 +154,18 @@ def remember_turn(user_id: str, human_text: str, ai_text: str) -> list[str]:
     so strict mode is not applicable. Keep this note so test code can pass
     strict=True to delete_by_ids if needed.
     """
-    store = get_user_store(user_id)
-    turn = f"User: {human_text}\nAssistant: {ai_text}"
-    ids = store.add_texts(
-        [turn],
-        metadatas=[{"user_id": user_id}],
-    )
-    log.debug("Stored memory for %s: %s", user_id, ids)
-    return ids
+    from langchain_actian_vectorai.actian_vectorai import ActianVectorAIException
+    for attempt in range(2):
+        try:
+            store = get_user_store(user_id)
+            turn = f"User: {human_text}\nAssistant: {ai_text}"
+            ids = store.add_texts([turn], metadatas=[{"user_id": user_id}])
+            log.debug("Stored memory for %s: %s", user_id, ids)
+            return ids
+        except (VAIConnectionError, ActianVectorAIException) as exc:
+            if attempt == 0:
+                log.warning("remember_turn: reconnecting after error: %s", exc)
+                _reset_client()
+                continue
+            raise
+    return []

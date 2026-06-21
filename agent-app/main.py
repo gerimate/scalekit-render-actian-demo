@@ -265,8 +265,12 @@ def recall(user_id: str = Query(...), query: str = Query(...), k: int = Query(5)
     Inspect what a user would recall for a given query.
     Used in the isolation demo to prove cross-user leakage is zero.
     """
-    results = recall_memories(user_id, query, k=k)
-    return {"user_id": user_id, "query": query, "results": results}
+    try:
+        results = recall_memories(user_id, query, k=k)
+        return {"user_id": user_id, "query": query, "results": results}
+    except Exception as exc:
+        log.exception("recall: error for user %s query %r", user_id, query)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.get("/admin/db-stats")
