@@ -14,7 +14,9 @@ import os
 from functools import lru_cache
 
 from actian_vectorai import Distance, VectorAIClient, VectorParams
-from actian_vectorai.exceptions import VectorAIConnectionError, VectorAITimeoutError, ChannelClosedError
+from actian_vectorai.exceptions import (
+    VectorAIConnectionError, VectorAITimeoutError, ChannelClosedError, CollectionNotFoundError
+)
 from langchain_actian_vectorai import ActianVectorAIVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
 
@@ -70,7 +72,7 @@ def collection_name(user_id: str) -> str:
     return f"user-{user_id}-memories"
 
 
-_CONNECTION_ERRORS = (VectorAIConnectionError, VectorAITimeoutError, ChannelClosedError)
+_CONNECTION_ERRORS = (VectorAIConnectionError, VectorAITimeoutError, ChannelClosedError, CollectionNotFoundError)
 
 
 def get_or_create_user_collection(user_id: str) -> str:
