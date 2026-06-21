@@ -251,6 +251,27 @@ def recall(user_id: str = Query(...), query: str = Query(...), k: int = Query(5)
     return {"user_id": user_id, "query": query, "results": results}
 
 
+@app.get("/admin/db-stats")
+def db_stats():
+    """
+    Return collection names and per-collection vector counts from VectorAI DB.
+    Also reports total vectors against the 5,000 Community Edition cap.
+    """
+    from memory import _get_client
+    client = _get_client()
+    collections = client.collections.list()
+    counts = {}
+    for col in collections:
+        counts[col] = client.points.count(col)
+    total = sum(counts.values())
+    return {
+        "collections": counts,
+        "total_vectors": total,
+        "cap": 5000,
+        "cap_remaining": 5000 - total,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Demo UI
 # ---------------------------------------------------------------------------

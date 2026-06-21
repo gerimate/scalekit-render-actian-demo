@@ -36,8 +36,10 @@ services:
       # Container will not start without this.
       - key: ACTIAN_VECTORAI_ACCEPT_EULA
         value: "YES"
-    # Persistent disk must be added manually in the Render dashboard after first deploy:
-    # Disks → Add Disk → mountPath: /var/lib/actian-vectorai, size: 10 GB
+    disk:
+      name: vectorai-data
+      mountPath: /var/lib/actian-vectorai
+      sizeGB: 10
 
   # -------------------------------------------------------------------------
   # agent-app — public Python web service
