@@ -80,49 +80,24 @@ def get_or_create_user_collection(user_id: str) -> str:
     """
     Ensure the per-user collection exists and return its name.
 
-    Retries once on connection-level errors (e.g. after a DB restart)
-    by resetting the singleton and reconnecting.
+    Uses collections.get_or_create which is idempotent, then retries
+    once on connection-level errors (e.g. after a DB restart).
     """
     name = collection_name(user_id)
     for attempt in range(2):
         try:
             client = _get_client()
-            client.collections.create(
+            client.collections.get_or_create(
                 name,
                 vectors_config=VectorParams(size=EMBEDDING_DIM, distance=DISTANCE),
             )
-            log.info("Created collection %s", name)
+            log.debug("get_or_create collection %s OK", name)
             return name
-        except CollectionExistsError:
-            # Verify the collection is actually healthy before returning.
-            # After a DB restart with disk, the metadata may survive but the
-            # data files can be inconsistent → points.count() returns NOT_FOUND.
-            # If that happens, delete the broken metadata and recreate.
-            try:
-                _get_client().points.count(name)
-                log.debug("Collection %s already exists and is healthy", name)
-                return name
-            except (CollectionNotFoundError, CollectionNotReadyError) as hc_exc:
-                log.warning(
-                    "Collection %s exists in metadata but is broken (%s) — "
-                    "deleting and recreating",
-                    name, hc_exc,
-                )
-                try:
-                    _get_client().collections.delete(name)
-                except VectorAIError:
-                    pass
-                continue  # retry create on next attempt
         except VAIConnectionError as exc:
             if attempt == 0:
                 log.warning("VectorAI connection error, reconnecting: %s", exc)
                 _reset_client()
                 continue
-            raise
-        except Exception as exc:
-            if "already exists" in str(exc).lower():
-                log.debug("Collection %s already exists (string match) — OK", name)
-                return name
             raise
     return name
 

@@ -281,16 +281,24 @@ def db_stats():
     for attempt in range(2):
         try:
             client = _get_client()
-            collections = client.collections.list()
-            counts: dict = {}
-            for col in collections:
+            col_names = client.collections.list()
+            info: dict = {}
+            for col in col_names:
                 try:
-                    counts[col] = client.points.count(col)
+                    ci = client.collections.get_info(col)
+                    info[col] = {
+                        "vectors_count": ci.vectors_count,
+                        "status": str(ci.status),
+                        "health": str(ci.health_status_ext),
+                    }
                 except VectorAIError as col_exc:
-                    log.warning("db-stats: count failed for %s: %s", col, col_exc)
-                    counts[col] = -1
-            total = sum(v for v in counts.values() if v >= 0)
-            return {"collections": counts, "total_vectors": total, "cap": 5000, "cap_remaining": 5000 - total}
+                    log.warning("db-stats: get_info failed for %s: %s", col, col_exc)
+                    info[col] = {"vectors_count": -1, "status": "unknown", "health": "unknown"}
+            total = sum(
+                v["vectors_count"] for v in info.values()
+                if isinstance(v.get("vectors_count"), int) and v["vectors_count"] >= 0
+            )
+            return {"collections": info, "total_vectors": total, "cap": 5000, "cap_remaining": 5000 - total}
         except VAIConnectionError as exc:
             if attempt == 0:
                 log.warning("db-stats: reconnecting after connection error: %s", exc)
